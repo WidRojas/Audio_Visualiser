@@ -3,7 +3,7 @@ TUI Audio Visualizer
 
 ![image](./showcase.gif)
 
-# Instalation
+# Installation
 ```
 git clone https://github.com/Widarduino/Audio_Visualiser.git
 cd Audio_Visualizer
