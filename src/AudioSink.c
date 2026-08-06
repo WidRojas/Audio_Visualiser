@@ -7,7 +7,7 @@
  Audio filter using \ref pw_filter "pw_filter".
  [title]
  */
-
+#include "AudioSink.h"
 #include <stdio.h>
 #include <errno.h>
 #include <math.h>
@@ -19,7 +19,6 @@
 #include <pipewire/pipewire.h>
 #include <pipewire/filter.h>
 
-struct data;
 
 struct port {
         struct data *data;
@@ -36,8 +35,13 @@ static void on_process(void *userdata, struct spa_io_position *position)
 {
 
         static int passes = 0;
-        FILE* fptr;
         char file_buffer[10]; 
+
+        FILE* fptr = fopen("buffer", "w");
+        if (fptr == NULL) {
+                perror("failed to open buffer.txt");
+                return;
+        }
 
         struct data *data = userdata;
         float *in;
@@ -45,29 +49,20 @@ static void on_process(void *userdata, struct spa_io_position *position)
 
         pw_log_trace("do process %d", n_samples);
 
-        in = pw_filter_get_dsp_buffer(data->in_port, n_samples);
-        
-        // get data and samples
-        if (fptr == NULL)
-                return;
 
-        fptr = fopen("./fft_C/buffer.txt", "w");
+        in = pw_filter_get_dsp_buffer(data->in_port, n_samples);
+        if (in == NULL) {
+                fprintf(stderr,"failed to get dsp");
+                return;
+        }
+        // get data and samples
 
         for (int i = 0; i < n_samples ; i++){
                 sprintf(file_buffer, "%f\n",in[i]);
                 fputs(file_buffer,fptr);
-        };
-        passes++;
-
-        // the debug line
-              //  sprintf(file_buffer, "logged:%d", passes);
-                //fputs(file_buffer,fptr);
-
+        }; // this can be streamlined with a memcpy or something
 
         fclose(fptr);
-
-        if (in == NULL )
-                return;
 }
 
 static const struct pw_filter_events filter_events = {
@@ -81,7 +76,7 @@ static void do_quit(void *userdata, int signal_number)
         pw_main_loop_quit(data->loop);
 }
 
-int main(int argc, char *argv[])
+void *AudioSink(void *arg)
 {
         struct data data = { 0, };
         const struct spa_pod *params[1];
@@ -89,7 +84,7 @@ int main(int argc, char *argv[])
         uint8_t buffer[1024];
         struct spa_pod_builder b = SPA_POD_BUILDER_INIT(buffer, sizeof(buffer));
 
-        pw_init(&argc, &argv);
+        pw_init(NULL, NULL);
 
         /* make a main loop. If you already have another main loop, you can add
          * the fd of this pipewire mainloop to it. */
@@ -140,15 +135,12 @@ int main(int argc, char *argv[])
                                 PW_FILTER_FLAG_RT_PROCESS,
                                 params, n_params) < 0) {
                 fprintf(stderr, "can't connect\n");
-                return -1;
+                return NULL;
         }
 
         /* and wait while we let things run */
         pw_main_loop_run(data.loop);
-
         pw_filter_destroy(data.filter);
         pw_main_loop_destroy(data.loop);
         pw_deinit();
-
-        return 0;
 }
