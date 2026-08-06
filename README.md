@@ -3,10 +3,13 @@ TUI Audio Visualizer
 
 ![image](./showcase.gif)
 
-### TO RUN
+# Instalation
+```
+git clone https://github.com/Widarduino/Audio_Visualiser.git
+cd Audio_Visualizer
+make
+```
+# Quickstart
 
-1.) start FFTW_SINK
-
-2.) pipe desired input into sync using either CLI tools or external software ie.(qpwgraph)
-
-3.) run Visualiser inside of /fftw_C
+1. Run Indicate
+2. Pipe desired audio channel into sink via CLI tools or external software(qpwgraph)
