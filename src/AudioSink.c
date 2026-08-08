@@ -56,6 +56,7 @@ static void on_process(void *userdata, struct spa_io_position *position)
                 return;
         }
         // get data and samples
+       //printf("%d\n",position->clock.rate.denom); sample rate
 
         for (int i = 0; i < n_samples ; i++){
                 sprintf(file_buffer, "%f\n",in[i]);
@@ -143,4 +144,6 @@ void *AudioSink(void *arg)
         pw_filter_destroy(data.filter);
         pw_main_loop_destroy(data.loop);
         pw_deinit();
+
+        return NULL;
 }

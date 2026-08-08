@@ -8,7 +8,6 @@ int main(int argc,char **argv){
 
 	pthread_t Visualizer;
 
-
 	pthread_create(&Visualizer, NULL,AudioSink,NULL);
 	pthread_create(&Visualizer, NULL,FFTW(argc, argv),NULL);
 
