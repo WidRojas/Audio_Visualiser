@@ -4,12 +4,15 @@ OBJS=$(patsubst %.c,%.o,$(SRCS))
 CFLAGS= -lfftw3 -lm -g $$(pkg-config --cflags --libs libpipewire-0.3) 
 INC=-Iinc
 BIN=Indicate
+FILES=buffer
 
-all:
-	$(CC) -c ./src/main.c $(INC)
-	$(CC) -c ./src/fft.c $(INC) $(CFLAGS) 
-	$(CC) -c ./src/AudioSink.c $(INC) $(CFLAGS)
+all: $(OBJS) $(FILES) 
 	$(CC) $(OBJS) -o $(BIN) $(INC) $(CFLAGS)
+
+%.o:./src/%.c
+	$(CC) -c $^ $(INC) $(CFLAGS)
+
+$(FILES):
 	touch buffer
 
 clean:
