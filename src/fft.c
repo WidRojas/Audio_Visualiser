@@ -20,7 +20,9 @@ void fitdata(fftw_complex *out, double *fitted, int size);
 void display(double *data, int size, double sensitivity,int cap,uint8_t *UART);
 void normalizeLoudness(double *fitted,int size);
 
-// TO DO : currently there is an issue with displaying and the averaging that causes buffer to fail when sounds drops.
+// Fixed : buffer overflowing issue 
+// TODO : fitting needs to accpunt for proper audio ranges
+//  this explains why audio is primarilly in the bass tones
 
 void enableSerial();
 
@@ -34,7 +36,7 @@ void *FFTW(int argc,char **argv){
   double *bar_data;
   FILE *fptr;
   
-  int bar_data_size = 30;
+  int bar_data_size = 10;
   double bar_sensitivity = 0.5;
   int bar_cap = 25;
 
@@ -54,12 +56,12 @@ void *FFTW(int argc,char **argv){
     bar_cap = strtol(argv[3],NULL,10);
   }
 
-  if ((bar_data = (double*)malloc(bar_data_size * sizeof(double))) == NULL){
+  if ((bar_data = (double*)calloc(bar_data_size,sizeof(double))) == NULL){
     printf("failed to allocate bar data array");
     return NULL;
   }
 
- if (( LEDBUFF =(uint8_t*)malloc(bar_data_size * sizeof(uint8_t))) == NULL ){
+ if (( LEDBUFF =(uint8_t*)calloc(bar_data_size, sizeof(uint8_t))) == NULL ){
     printf("failed to allocate LEDBUFF memory");
     return NULL;
   }
@@ -77,40 +79,41 @@ void *FFTW(int argc,char **argv){
   // https://www.fftw.org/fftw3_doc/One_002dDimensional-DFTs-of-Real-Data.html
 
   while (1) {
-
     parse_frame(in, fptr); // parse from pipewire filter , this needs to not use a file in order to run independently
     fftw_execute(p); // apply fftw
     usleep(10); // this only exist because file, remove later
-    printf("\e[1;1H\e[2J");
+    //printf("\e[1;1H\e[2J");
     fitdata(out, bar_data, bar_data_size);
-    normalizeLoudness(bar_data,bar_data_size);
-    display(bar_data,bar_data_size,bar_sensitivity,bar_cap,LEDBUFF);
+    //display(bar_data,bar_data_size,bar_sensitivity,bar_cap,LEDBUFF);
     //write(fd,LEDBUFF,sizeof(LEDBUFF)); LED UART
     // instead of while 1 we need to handle sigterm in main so we actaully run clean up code
+    memset(bar_data,0,bar_data_size * sizeof(double));
   }
 
   free(bar_data);
   free(LEDBUFF);
   fclose(fptr);
   //close(fd);
-  fftw_free(in);
   fftw_free(out);
 
   return NULL;
 }
 
-void normalizeLoudness(double *fitted,int size){
-  double lowest = fitted[0];
+void normalizeLoudness(double *fitted,int size){ // this is stil broken 
 
-  for (int index = 0; index < size; index++ ){
-    if (fitted[index] < lowest) {
-      lowest = fitted[index];
-    }
+  for (int i = 0; i < size ; i++){
+    printf("%d : %f\n",i,fitted[i]);
   }
-  for (int index = 0; index < size; index++ ){
-    fitted[index] = 10 * log10(fitted[index]/ lowest);
-  } // 
-}
+
+  printf("\n");
+  printf("%d\n",size);
+
+  for (int i = 0; i < size ; i++){
+    printf("%d : %f\n",i,fitted[i]);
+  }
+
+} 
+
 
 void parse_frame(double *input, FILE *fptr) {
 
@@ -124,6 +127,22 @@ void parse_frame(double *input, FILE *fptr) {
 
 void fitdata(fftw_complex *out, double *fitted ,int size){
 
+  /*
+  at the moment sampling rate is 48k
+  and samples taken is 2048
+  this means that we are dealing with 24khz 
+  24k / 1048 unique samples = 23hz per parsed element
+  */
+
+  int uniqueSamples = 1025;
+  double magnitudes[uniqueSamples];
+
+  for (int i = 0; i < uniqueSamples; i++){
+    magnitudes[i] = sqrt((pow(out[i][0],2))+(pow(out[i][1],2)));
+    printf("%d,%f\n",i,magnitudes[i]);
+  }
+
+  /* Simply average out to fill the buffer
   int orignal = size;
   int SamplesPerBar = ceil((double)(FRAME_DATA/2.0 + 1)/(double)size);
   int remaining = ((FRAME_DATA/2) + 1) % SamplesPerBar;
@@ -150,6 +169,8 @@ void fitdata(fftw_complex *out, double *fitted ,int size){
       i++;
     }
   }
+  */
+
   /*
   for (int i = 0 ; i < orignal; i++) {
     printf("%f at %d\n",fitted[i],i);
