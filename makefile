@@ -5,6 +5,7 @@ CFLAGS= -lfftw3 -lm -g $$(pkg-config --cflags --libs libpipewire-0.3)
 INC=-Iinc
 BIN=Indicate
 FILES=buffer
+# add -O2 at some point current breaks due to parse frame
 
 all: $(OBJS) $(FILES) 
 	$(CC) $(OBJS) -o $(BIN) $(INC) $(CFLAGS)

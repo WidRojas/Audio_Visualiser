@@ -14,15 +14,26 @@
 #define FRAME_DATA 2048
 // this include mirror signals so we divide by 2 in data fitting
 
+// starting postion
+// range 
+// counter
+  typedef struct {
+    int start;
+    int range;
+    int counter;
+  } audioSection;
+
 void parse_frame(double *input, FILE *fptr);
 void write_out(fftw_complex *out);
 void fitdata(fftw_complex *out, double *fitted, int size);
 void display(double *data, int size, double sensitivity,int cap,uint8_t *UART);
 void normalizeLoudness(double *fitted,int size);
+void updateFrame(audioSection *frame, int i);
 
-// Fixed : buffer overflowing issue 
-// TODO : fitting needs to accpunt for proper audio ranges
-//  this explains why audio is primarilly in the bass tones
+// Fixed : fit data mostly works 
+//TODO :
+//  fit data is extremely unoptimized due to updateframe (easy fix)
+//  file parsing need to replaced with some type of thread coordinated variable
 
 void enableSerial();
 
@@ -82,9 +93,9 @@ void *FFTW(int argc,char **argv){
     parse_frame(in, fptr); // parse from pipewire filter , this needs to not use a file in order to run independently
     fftw_execute(p); // apply fftw
     usleep(10); // this only exist because file, remove later
-    //printf("\e[1;1H\e[2J");
+    printf("\e[1;1H\e[2J");
     fitdata(out, bar_data, bar_data_size);
-    //display(bar_data,bar_data_size,bar_sensitivity,bar_cap,LEDBUFF);
+    display(bar_data,bar_data_size,bar_sensitivity,bar_cap,LEDBUFF);
     //write(fd,LEDBUFF,sizeof(LEDBUFF)); LED UART
     // instead of while 1 we need to handle sigterm in main so we actaully run clean up code
     memset(bar_data,0,bar_data_size * sizeof(double));
@@ -99,22 +110,6 @@ void *FFTW(int argc,char **argv){
   return NULL;
 }
 
-void normalizeLoudness(double *fitted,int size){ // this is stil broken 
-
-  for (int i = 0; i < size ; i++){
-    printf("%d : %f\n",i,fitted[i]);
-  }
-
-  printf("\n");
-  printf("%d\n",size);
-
-  for (int i = 0; i < size ; i++){
-    printf("%d : %f\n",i,fitted[i]);
-  }
-
-} 
-
-
 void parse_frame(double *input, FILE *fptr) {
 
   fseek(fptr, 0, SEEK_SET);
@@ -127,55 +122,69 @@ void parse_frame(double *input, FILE *fptr) {
 
 void fitdata(fftw_complex *out, double *fitted ,int size){
 
+  int uniqueSamples = 1025;
+  double magnitudes[uniqueSamples];
+  
+
   /*
   at the moment sampling rate is 48k
   and samples taken is 2048
   this means that we are dealing with 24khz 
   24k / 1048 unique samples = 23hz per parsed element
   */
-
-  int uniqueSamples = 1025;
-  double magnitudes[uniqueSamples];
+  int frames = 7;
+  audioSection frame[] = {
+    {0,3}, // 1. 20 - 60 sub bass    
+    {3,8}, // 2. 60 - 250 bass
+    {11,10}, // 3. 250 - 500 low mids
+    {21,65}, // 4. 500 - 2000 midrange 
+    {86,86}, // 5. 2k - 4k high mids
+    {172,86}, // 6. 4k - 6k presence
+    {256,769} // 7. 6k - 24k brilliance
+  };
 
   for (int i = 0; i < uniqueSamples; i++){
     magnitudes[i] = sqrt((pow(out[i][0],2))+(pow(out[i][1],2)));
-    printf("%d,%f\n",i,magnitudes[i]);
   }
 
-  /* Simply average out to fill the buffer
-  int orignal = size;
-  int SamplesPerBar = ceil((double)(FRAME_DATA/2.0 + 1)/(double)size);
-  int remaining = ((FRAME_DATA/2) + 1) % SamplesPerBar;
-
-  int i = 0;
-  int j = 0;
-  double magnitude = 0;
-
-  if (remaining != 0) {
-    size--;
-    for (int k = 1 ; k <= remaining; k++){
-      magnitude = sqrt(pow((out[FRAME_DATA/2 +1 - k][0]),2) + pow((out[FRAME_DATA/2 +1 - k][1]),2));
-      fitted[size] += magnitude;
-    }
-      fitted[size] = fitted[size] / remaining;
-  }
-
+  int i = 0; 
   while (i < size){
-    magnitude = sqrt(pow((out[j][0]),2) + pow((out[j][1]),2));
-    fitted[i] += magnitude;
-    j++;
-    if ((j % (SamplesPerBar)) == 0 ) {
-      fitted[i] = fitted[i] / SamplesPerBar;
-      i++;
-    }
+    updateFrame(frame, i);
+    i++;
   }
-  */
 
-  /*
-  for (int i = 0 ; i < orignal; i++) {
-    printf("%f at %d\n",fitted[i],i);
-  } */
+  int currentindex = 0;
 
+  for (int i = 0 ; i < frames; i++){
+      if (frame[i].counter == frame[i].range){
+        for (int j = 0 ; j < frame[i].range;j++){
+          fitted[currentindex] = magnitudes[frame[i].start + j];
+          currentindex++;
+        }
+      } else if (frame[i].counter < frame[i].range){
+        int temp = frame[i].counter -1;
+        for (int j = 0 ; j < frame[i].counter - 1 ; j++){ 
+          fitted[currentindex] = magnitudes[frame[i].start + j];
+          currentindex++;
+        } 
+        for (int j = 0; j <= (frame[i].range - frame[i].counter) ; j++ ){
+          fitted[currentindex] += magnitudes[frame[i].start + temp + j];
+        }
+        fitted[currentindex] = fitted[currentindex] / (frame[i].range - (frame[i].counter -1)) ;
+        currentindex++;
+      }
+    }
+  
+    // each range is then multiplied based on some constant rather than a log scale ( because idk and good enough for visualization)
+}
+
+void updateFrame(audioSection *frame, int i) {
+  while(frame[i % 3].counter >= frame[i%3].range){
+    i++;
+  }
+    frame[i % 3].counter++;
+
+  return;
 }
 
 void enableSerial(){
