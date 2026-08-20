@@ -8,6 +8,10 @@
  [title]
  */
 #include "AudioSink.h"
+#include "fftw.h"
+
+#include <bits/pthreadtypes.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <errno.h>
 #include <math.h>
@@ -29,23 +33,18 @@ struct data {
         struct pw_filter *filter;
         struct port *in_port;
         struct port *out_port;
+        startup *startup;
 };
 
 static void on_process(void *userdata, struct spa_io_position *position)
 {
 
-        static int passes = 0;
-        char file_buffer[10]; 
-
-        FILE* fptr = fopen("buffer", "w");
-        if (fptr == NULL) {
-                perror("failed to open buffer.txt");
-                return;
-        }
 
         struct data *data = userdata;
         float *in;
         uint32_t n_samples = position->clock.duration;
+
+        startup *buffer = data->startup;
 
         pw_log_trace("do process %d", n_samples);
 
@@ -58,12 +57,17 @@ static void on_process(void *userdata, struct spa_io_position *position)
         // get data and samples
        //printf("%d\n",position->clock.rate.denom); sample rate
 
+        pthread_mutex_lock(buffer->lock);
+
         for (int i = 0; i < n_samples ; i++){
-                sprintf(file_buffer, "%f\n",in[i]);
-                fputs(file_buffer,fptr);
+
+                buffer->data[i] = in[i];
+                //sprintf(file_buffer, "%f\n",in[i]);
+                //fputs(file_buffer,fptr);
         }; // this can be streamlined with a memcpy or something
 
-        fclose(fptr);
+        pthread_mutex_unlock(buffer->lock);
+
 }
 
 static const struct pw_filter_events filter_events = {
@@ -79,6 +83,8 @@ static void do_quit(void *userdata, int signal_number)
 
 void *AudioSink(void *arg)
 {
+
+
         struct data data = { 0, };
         const struct spa_pod *params[1];
         uint32_t n_params = 0;
@@ -90,6 +96,8 @@ void *AudioSink(void *arg)
         /* make a main loop. If you already have another main loop, you can add
          * the fd of this pipewire mainloop to it. */
         data.loop = pw_main_loop_new(NULL);
+
+        data.startup = arg;
 
         pw_loop_add_signal(pw_main_loop_get_loop(data.loop), SIGINT, do_quit, &data);
         pw_loop_add_signal(pw_main_loop_get_loop(data.loop), SIGTERM, do_quit, &data);

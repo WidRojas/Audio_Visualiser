@@ -3,12 +3,16 @@
 //  malloc should probably only be freed at the very end and use realloc during runtime
 //  program should handle sigterm events
 //  include the uart as a flag (also clearer flags)
+//
+//  change rendering framerate and use syswrites to improve performance
+//  rather than clearing reset the cursor
 
 #include <asm-generic/ioctls.h>
 #include <asm-generic/termbits.h>
 
 #include <fcntl.h>
 #include <fftw3.h>
+#include <fftw.h>
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -29,7 +33,7 @@ multiplier : gain on a segment
 typedef struct {
   int start;
   int range;
-  int multipler;
+  double multipler;
   int counter;
 } audioSection;
 
@@ -43,16 +47,16 @@ this means that we are dealing with 24khz
 // adjust the multipliers to taste
 int frames = 7;
 audioSection frame[] = {
-    {0, 3, 1},     // 1. 20 - 60 sub bass
-    {3, 8, 1},     // 2. 60 - 250 bass
+    {0, 3, 0.8},     // 1. 20 - 60 sub bass
+    {3, 8, 0.8},     // 2. 60 - 250 bass
     {11, 10, 1},   // 3. 250 - 500 low mids
     {21, 65, 3},   // 4. 500 - 2000 midrange
-    {86, 86, 4},   // 5. 2k - 4k high mids
-    {172, 86, 5},  // 6. 4k - 6k presence
+    {86, 86, 6},   // 5. 2k - 4k high mids
+    {172, 86, 7},  // 6. 4k - 6k presence
     {256, 769, 10} // 7. 6k - 24k brilliance
 };
 
-void parse_frame(double *input, FILE *fptr);
+void parse_frame(double *input, startup arg);
 void write_out(fftw_complex *out);
 void fitdata(fftw_complex *out, double *fitted, int size);
 void display(double *data, int size, double sensitivity, int cap,
@@ -62,31 +66,32 @@ void updateFrame(audioSection *frame, int size);
 
 void enableSerial();
 
-void *FFTW(int argc, char **argv) {
+void *FFTW(void *arg) {
+
+  startup *args = arg;
 
   fftw_complex *out;
   fftw_plan p;
   uint8_t *LEDBUFF;
   double *bar_data;
-  FILE *fptr;
 
   int bar_data_size = 25;
   double bar_sensitivity = 0.2;
   int bar_cap = 40;
 
-  if (argc == 2) { // this prob needs error checks
-    bar_data_size = strtol(argv[1], NULL, 10);
+  if (args->argc == 2) { // this prob needs error checks
+    bar_data_size = strtol(args->argv[1], NULL, 10);
   }
 
-  if (argc == 3) {
-    bar_data_size = strtol(argv[1], NULL, 10);
-    bar_sensitivity = strtod(argv[2], NULL);
+  if (args->argc== 3) {
+    bar_data_size = strtol(args->argv[1], NULL, 10);
+    bar_sensitivity = strtod(args->argv[2], NULL);
   }
 
-  if (argc == 4) {
-    bar_data_size = strtol(argv[1], NULL, 10);
-    bar_sensitivity = strtod(argv[2], NULL);
-    bar_cap = strtol(argv[3], NULL, 10);
+  if (args->argc == 4) {
+    bar_data_size = strtol(args->argv[1], NULL, 10);
+    bar_sensitivity = strtod(args->argv[2], NULL);
+    bar_cap = strtol(args->argv[3], NULL, 10);
   }
 
   if ((bar_data = (double *)calloc(bar_data_size, sizeof(double))) == NULL) {
@@ -99,11 +104,6 @@ void *FFTW(int argc, char **argv) {
     return NULL;
   }
 
-  if ((fptr = fopen("buffer", "r")) == NULL) { // open pipewire file
-    perror("FAILED TO OPEN FRAMEBUFFER\n");
-    return NULL;
-  }
-
   double in[FRAME_DATA];
 
   out = (fftw_complex *)fftw_malloc(sizeof(fftw_complex) * FRAME_DATA);
@@ -113,12 +113,9 @@ void *FFTW(int argc, char **argv) {
   updateFrame(frame, bar_data_size);
 
   while (1) {
-    parse_frame(in, fptr); // parse from pipewire filter , this does not need to open a file
-                           // in order to run independently (also really expensive)
-    
+    parse_frame(in, *args); 
     fftw_execute(p);       // apply fftw
     usleep(10);            // this only exist because file, remove later
-
     printf("\e[1;1H\e[2J"); // clear screen
     fitdata(out, bar_data, bar_data_size);
     display(bar_data, bar_data_size, bar_sensitivity, bar_cap, LEDBUFF);
@@ -129,6 +126,7 @@ void *FFTW(int argc, char **argv) {
     // TODO :
     //  instead of while 1 we need to handle sigterm in main so we actaully run
     //  clean up code
+    //
     memset(bar_data, 0, bar_data_size * sizeof(double));
   }
 
@@ -137,20 +135,18 @@ void *FFTW(int argc, char **argv) {
   
   free(bar_data);
   free(LEDBUFF);
-  fclose(fptr);
   fftw_free(out);
 
   return NULL;
 }
 
-void parse_frame(double *input, FILE *fptr) {
+void parse_frame(double *input, startup arg) {
 
-  fseek(fptr, 0, SEEK_SET);
-  fflush(fptr);
-
-  for (int i = 0; i < FRAME_DATA; i++) {
-    fscanf(fptr, "%lf", &input[i]);
-  }
+      pthread_mutex_lock(arg.lock);
+    for (int i = 0; i < FRAME_DATA; i++) {
+      input[i] = arg.data[i];
+    }
+      pthread_mutex_unlock(arg.lock);
 }
 
 void fitdata(fftw_complex *out, double *fitted, int size) {
