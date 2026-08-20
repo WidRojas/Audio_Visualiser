@@ -1,7 +1,5 @@
 //  TODO :
-//  file parsing need to replaced with some type of thread coordinated variable
 //  malloc should probably only be freed at the very end and use realloc during runtime
-//  program should handle sigterm events
 //  include the uart as a flag (also clearer flags)
 //
 //  change rendering framerate and use syswrites to improve performance
@@ -112,10 +110,11 @@ void *FFTW(void *arg) {
 
   updateFrame(frame, bar_data_size);
 
-  while (1) {
+  while ( (int volatile)args->isRunning[0] == 1) {
+
     parse_frame(in, *args); 
     fftw_execute(p);       // apply fftw
-    usleep(33333);            // framerate
+    usleep(33333);            // framerate (30fps)
     printf("\e[1;1H\e[2J"); // clear screen
     fitdata(out, bar_data, bar_data_size);
     display(bar_data, bar_data_size, bar_sensitivity, bar_cap, LEDBUFF);

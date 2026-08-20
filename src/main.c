@@ -1,18 +1,27 @@
 #include <pthread.h>
 #include <stdio.h>
+#include <signal.h>
 #include "AudioSink.h"
 #include "fftw.h"
 
 	pthread_mutex_t lock;
 
+static volatile int status = 1;
+
+void interupthandler (int sig){
+	status = 0;
+}
+
 int main(int argc,char **argv){
+
+	signal(SIGINT,interupthandler);
 
 	int size = 2048;
 	double data_buffer[2048];
 
 	pthread_mutex_init(&lock,NULL);
 
-	startup startargs = {argc,argv,data_buffer,&lock};
+	startup startargs = {argc,argv,data_buffer,&lock,&status};
 
 
 	pthread_t fftwsink;

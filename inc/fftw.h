@@ -8,6 +8,7 @@ typedef struct {
 	char **argv;
 	double *data;
 	pthread_mutex_t *lock;
+	int volatile *isRunning;
 } startup;
 
 void *FFTW(void *arg);

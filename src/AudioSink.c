@@ -46,6 +46,11 @@ static void on_process(void *userdata, struct spa_io_position *position)
 
         startup *buffer = data->startup;
 
+        if (buffer->isRunning[0] != 1) {
+                pw_main_loop_quit(data->loop);
+        }
+
+
         pw_log_trace("do process %d", n_samples);
 
 
@@ -75,11 +80,6 @@ static const struct pw_filter_events filter_events = {
         .process = on_process,
 };
 
-static void do_quit(void *userdata, int signal_number)
-{
-        struct data *data = userdata;
-        pw_main_loop_quit(data->loop);
-}
 
 void *AudioSink(void *arg)
 {
@@ -99,8 +99,6 @@ void *AudioSink(void *arg)
 
         data.startup = arg;
 
-        pw_loop_add_signal(pw_main_loop_get_loop(data.loop), SIGINT, do_quit, &data);
-        pw_loop_add_signal(pw_main_loop_get_loop(data.loop), SIGTERM, do_quit, &data);
 
         /* Create a simple filter, the simple filter manages the core and remote
          * objects for you if you don't need to deal with them.
