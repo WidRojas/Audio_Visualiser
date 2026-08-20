@@ -1,3 +1,9 @@
+//  TODO :
+//  file parsing need to replaced with some type of thread coordinated variable
+//  malloc should probably only be freed at the very end and use realloc during runtime
+//  program should handle sigterm events
+//  include the uart as a flag (also clearer flags)
+
 #include <asm-generic/ioctls.h>
 #include <asm-generic/termbits.h>
 
@@ -14,13 +20,6 @@
 // this include mirror signals so we divide by 2 in data fitting
 #define FRAME_DATA 2048
 
-/*
-at the moment sampling rate is 48k
-and samples taken is 2048
-this means that we are dealing with 24khz
-24k / 1048 unique samples = 23hz per parsed element
-*/
-
 /* this organizes how data is distributed per bar depending on size
 
 start : where a segment begins in data
@@ -34,6 +33,12 @@ typedef struct {
   int counter;
 } audioSection;
 
+/*
+at the moment sampling rate is 48k
+and samples taken is 2048
+this means that we are dealing with 24khz
+24k / 1048 unique samples = 23hz per parsed element
+*/
 
 // adjust the multipliers to taste
 int frames = 7;
@@ -54,8 +59,6 @@ void display(double *data, int size, double sensitivity, int cap,
              uint8_t *UART);
 void updateFrame(audioSection *frame, int size);
 
-//  TODO :
-//  file parsing need to replaced with some type of thread coordinated variable
 
 void enableSerial();
 
@@ -111,7 +114,7 @@ void *FFTW(int argc, char **argv) {
 
   while (1) {
     parse_frame(in, fptr); // parse from pipewire filter , this does not need to open a file
-                           // in order to run independently
+                           // in order to run independently (also really expensive)
     
     fftw_execute(p);       // apply fftw
     usleep(10);            // this only exist because file, remove later
@@ -184,16 +187,14 @@ void fitdata(fftw_complex *out, double *fitted, int size) {
       currentindex++;
     }
   }
-  // each range is then multiplied based on some constant rather than a log
-  // scale ( because idk and good enough for visualization)
 }
 
 void updateFrame(audioSection *frame, int size) {
   int accum = 0;
-  double capture = 0;
   int whole = 0;
-  double mantissa = 0;
   int remainingFrames = frames;
+  double capture = 0;
+  double mantissa = 0;
 
   for (int i = 0; i < frames; i++) {
     capture = (double)(size - accum) / (double)remainingFrames;
