@@ -115,7 +115,7 @@ void *FFTW(void *arg) {
   while (1) {
     parse_frame(in, *args); 
     fftw_execute(p);       // apply fftw
-    usleep(10);            // this only exist because file, remove later
+    usleep(33333);            // framerate
     printf("\e[1;1H\e[2J"); // clear screen
     fitdata(out, bar_data, bar_data_size);
     display(bar_data, bar_data_size, bar_sensitivity, bar_cap, LEDBUFF);
