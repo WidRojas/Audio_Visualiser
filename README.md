@@ -5,7 +5,7 @@ TUI Audio Visualizer
 
 # Installation
 ```
-git clone https://github.com/Widarduino/Audio_Visualiser.git
+git clone https://github.com/WidRojas/Audio_Visualiser.git
 cd Audio_Visualizer
 make
 ```
