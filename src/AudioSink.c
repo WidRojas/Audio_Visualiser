@@ -8,7 +8,7 @@
  [title]
  */
 #include "AudioSink.h"
-#include "fftw.h"
+#include "shared.h"
 
 #include <bits/pthreadtypes.h>
 #include <pthread.h>
@@ -22,6 +22,7 @@
 
 #include <pipewire/pipewire.h>
 #include <pipewire/filter.h>
+#include <string.h>
 
 
 struct port {
@@ -62,16 +63,13 @@ static void on_process(void *userdata, struct spa_io_position *position)
         // get data and samples
        //printf("%d\n",position->clock.rate.denom); sample rate
 
+
         pthread_mutex_lock(buffer->lock);
+        memcpy(buffer->data,in,sizeof(float) * n_samples);
 
-        for (int i = 0; i < n_samples ; i++){
-
-                buffer->data[i] = in[i];
-                //sprintf(file_buffer, "%f\n",in[i]);
-                //fputs(file_buffer,fptr);
-        }; // this can be streamlined with a memcpy or something
-
-        pthread_mutex_unlock(buffer->lock);
+        //if (buffer->buffered_Chunksize == buffer->expected_Chunksize){
+                pthread_mutex_unlock(buffer->lock);
+        //}
 
 }
 

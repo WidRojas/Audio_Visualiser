@@ -10,7 +10,6 @@
 
 #include <fcntl.h>
 #include <fftw3.h>
-#include <fftw.h>
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -19,6 +18,7 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 
+#include "shared.h"
 // this include mirror signals so we divide by 2 in data fitting
 #define FRAME_DATA 2048
 
@@ -143,7 +143,7 @@ void parse_frame(double *input, startup arg) {
 
       pthread_mutex_lock(arg.lock);
     for (int i = 0; i < FRAME_DATA; i++) {
-      input[i] = arg.data[i];
+      input[i] = (double)arg.data[i];
     }
       pthread_mutex_unlock(arg.lock);
 }

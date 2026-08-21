@@ -3,6 +3,8 @@
 #include <signal.h>
 #include "AudioSink.h"
 #include "fftw.h"
+#include "shared.h"
+
 
 	pthread_mutex_t lock;
 
@@ -17,11 +19,11 @@ int main(int argc,char **argv){
 	signal(SIGINT,interupthandler);
 
 	int size = 2048;
-	double data_buffer[2048];
+	float data_buffer[2048];
 
 	pthread_mutex_init(&lock,NULL);
 
-	startup startargs = {argc,argv,data_buffer,&lock,&status};
+	startup startargs = {argc,argv,&lock,&status,data_buffer,size,0};
 
 
 	pthread_t fftwsink;
