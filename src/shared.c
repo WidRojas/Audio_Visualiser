@@ -1,24 +1,27 @@
 #include "shared.h"
 #include <string.h>
+#include <stdio.h>
 
 void fill_data_buffer(startup *buffer, int incomingSize,
                       float *incomingStream) {
 
   startup *buf = buffer;
   float *out = buffer->data;
-  int copiedSize = buffer->buffered_Chunksize;
   int maxSize = buffer->expected_Chunksize;
-
-  if (copiedSize < maxSize) { // if there is insuf data
+  int finishedParsing= 0;
 
     // if incoming is less than required
-    if ((copiedSize + incomingSize) < (maxSize)) {
-      memcpy(&out[copiedSize], incomingStream, sizeof(float) * incomingSize); 
-      buffer->buffered_Chunksize += incomingSize; 
+    if ((buffer->buffered_Chunksize[0] + incomingSize) < (maxSize)) { // data may not be parsing properly here
+      memcpy(&out[buffer->buffered_Chunksize[0]], incomingStream, sizeof(float) * incomingSize); 
+      buffer->buffered_Chunksize[0] += incomingSize; 
 
-    } else if ((copiedSize + incomingSize) >= (maxSize)) {
-	memcpy(&out[copiedSize],incomingStream,sizeof(float) * (maxSize - copiedSize));
-        buffer->buffered_Chunksize = maxSize; 
+    } else if ((buffer->buffered_Chunksize[0] + incomingSize) >= (maxSize)) {
+      memcpy(&out[buffer->buffered_Chunksize[0]],incomingStream,sizeof(float) * (maxSize - buffer->buffered_Chunksize[0]));
+        buffer->buffered_Chunksize[0] = maxSize; 
     }
-  }
+
+    if (buffer->buffered_Chunksize[0] == maxSize){
+      buffer->is_ready[0] = 1;
+      finishedParsing = 1;
+    }
 }

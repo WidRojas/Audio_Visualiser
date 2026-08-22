@@ -11,7 +11,9 @@ typedef struct {
 
 	float *data;
 	int expected_Chunksize;
-	int buffered_Chunksize;
+	int volatile *buffered_Chunksize;
+	int volatile *is_ready;
+	int is_locked;
 
 	// possibly include flags indicating whether buffer is full and whether is has been read
 	// to coordinate with display thread

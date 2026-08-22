@@ -64,12 +64,11 @@ static void on_process(void *userdata, struct spa_io_position *position)
        //printf("%d\n",position->clock.rate.denom); sample rate
 
 
-        pthread_mutex_lock(buffer->lock);
-        memcpy(buffer->data,in,sizeof(float) * n_samples);
-
-        //if (buffer->buffered_Chunksize == buffer->expected_Chunksize){
+        if (buffer->is_ready[0] == 0 ){   // if data buffer is not full  this gets reset upon read
+                pthread_mutex_lock(buffer->lock); // lock out and parse new
+                fill_data_buffer(buffer,n_samples,in);
                 pthread_mutex_unlock(buffer->lock);
-        //}
+        }
 
 }
 

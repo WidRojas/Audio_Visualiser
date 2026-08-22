@@ -54,7 +54,7 @@ audioSection frame[] = {
     {256, 769, 10} // 7. 6k - 24k brilliance
 };
 
-void parse_frame(double *input, startup arg);
+void parse_frame(double *input, startup *arg);
 void write_out(fftw_complex *out);
 void fitdata(fftw_complex *out, double *fitted, int size);
 void display(double *data, int size, double sensitivity, int cap,
@@ -103,17 +103,33 @@ void *FFTW(void *arg) {
   }
 
   double in[FRAME_DATA];
+  memset(in, 0, sizeof(double)* FRAME_DATA);
 
   out = (fftw_complex *)fftw_malloc(sizeof(fftw_complex) * FRAME_DATA);
   p = fftw_plan_dft_r2c_1d(FRAME_DATA, in, out, FFTW_ESTIMATE);
   // https://www.fftw.org/fftw3_doc/One_002dDimensional-DFTs-of-Real-Data.html
 
   updateFrame(frame, bar_data_size);
-
+  
   while ( (int volatile)args->isRunning[0] == 1) {
 
-    parse_frame(in, *args); 
-    fftw_execute(p);       // apply fftw
+    pthread_mutex_lock(args->lock);
+
+    if(args->is_ready[0] == 1){
+      parse_frame(in, args); 
+      
+      //for (int i = 0 ; i < 2048 ; i++){
+        //printf("%f %d\n",in[i],i);
+      //}
+
+      fftw_execute(p);       // apply fftw
+      pthread_mutex_unlock(args->lock);
+
+    }  else {
+      pthread_mutex_unlock(args->lock);
+    }
+    
+    //
     usleep(33333);            // framerate (30fps)
     printf("\e[1;1H\e[2J"); // clear screen
     fitdata(out, bar_data, bar_data_size);
@@ -139,13 +155,16 @@ void *FFTW(void *arg) {
   return NULL;
 }
 
-void parse_frame(double *input, startup arg) {
+void parse_frame(double *input, startup *arg) {
 
-      pthread_mutex_lock(arg.lock);
+
     for (int i = 0; i < FRAME_DATA; i++) {
-      input[i] = (double)arg.data[i];
+      input[i] = (double)arg->data[i];
+      //printf("%f %d\n",input[i],i);
     }
-      pthread_mutex_unlock(arg.lock);
+      arg->buffered_Chunksize[0] = 0;
+      arg->is_ready[0] = 0;
+      
 }
 
 void fitdata(fftw_complex *out, double *fitted, int size) {
@@ -155,7 +174,9 @@ void fitdata(fftw_complex *out, double *fitted, int size) {
 
   for (int i = 0; i < uniqueSamples; i++) {
     magnitudes[i] = sqrt((pow(out[i][0], 2)) + (pow(out[i][1], 2)));
+    //printf("%f: %f :%f: %d\n",out[i][0],out[i][1],magnitudes[i],i);
   }
+  
 
   int currentindex = 0;
 
