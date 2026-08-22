@@ -14,6 +14,7 @@ static volatile int status = 1;
 static volatile int is_ready = 0;
 static volatile int bufferedsize = 0;
 
+
 void interupthandler (int sig){
 	status = 0;
 }
@@ -28,7 +29,7 @@ int main(int argc,char **argv){
 
 	pthread_mutex_init(&lock,NULL);
 
-	startup startargs = {argc,argv,&lock,&status,data_buffer,size,&bufferedsize,&is_ready};
+	startup startargs = {argc,argv,&lock,&status,data_buffer,size,&bufferedsize,&is_ready,NULL};
 
 
 	pthread_t fftwsink;

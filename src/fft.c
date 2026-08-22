@@ -19,6 +19,7 @@
 #include <unistd.h>
 
 #include "shared.h"
+
 // this include mirror signals so we divide by 2 in data fitting
 #define FRAME_DATA 2048
 
@@ -57,11 +58,8 @@ audioSection frame[] = {
 void parse_frame(double *input, startup *arg);
 void write_out(fftw_complex *out);
 void fitdata(fftw_complex *out, double *fitted, int size);
-void display(double *data, int size, double sensitivity, int cap,
-             uint8_t *UART);
+void display(double *data, int size, double sensitivity, int cap, uint8_t *UART);
 void updateFrame(audioSection *frame, int size);
-
-
 void enableSerial();
 
 void *FFTW(void *arg) {
@@ -129,8 +127,17 @@ void *FFTW(void *arg) {
       pthread_mutex_unlock(args->lock);
     }
     
-    //
-    usleep(33333);            // framerate (30fps)
+    /* Hardcoded for now 
+    current system was built under assumption that frames format would always be 2048
+    turns out applications negotiate this with pipewire so when aiming for 30 fps consider...
+
+    when frame size = 2048 timeout = 33333us
+    when frame size = 512  timeout = (33333/4)us  
+
+    this is because if frames are less than 2048 we need to run the filter 4 times
+    */
+    usleep(8333);
+    
     printf("\e[1;1H\e[2J"); // clear screen
     fitdata(out, bar_data, bar_data_size);
     display(bar_data, bar_data_size, bar_sensitivity, bar_cap, LEDBUFF);
@@ -138,10 +145,6 @@ void *FFTW(void *arg) {
     // UART feature
     // write(fd,LEDBUFF,sizeof(LEDBUFF)); LED UART
 
-    // TODO :
-    //  instead of while 1 we need to handle sigterm in main so we actaully run
-    //  clean up code
-    //
     memset(bar_data, 0, bar_data_size * sizeof(double));
   }
 
@@ -262,8 +265,7 @@ void enableSerial() {
   ioctl(fd, TCSETS2, &options);
 }
 
-void display(double *data, int size, double sensitivity, int cap,
-             uint8_t *UART) {
+void display(double *data, int size, double sensitivity, int cap, uint8_t *UART) {
   int barPosition = 0;
   double fillAmount = 0;
 
@@ -279,7 +281,7 @@ void display(double *data, int size, double sensitivity, int cap,
   }
   char *curr = buffer;
 
-  printf("\t[Indicate V1.3]\n");
+  printf("\t[Indicate V1.4]\n");
   while (barPosition < size) {
     if (fillAmount < data[barPosition]) {
       fillAmount += (1 / sensitivity);

@@ -51,6 +51,9 @@ static void on_process(void *userdata, struct spa_io_position *position)
                 pw_main_loop_quit(data->loop);
         }
 
+        //if (buffer->format == NULL){
+        //       buffer->format[0] = n_samples;
+        //}
 
         pw_log_trace("do process %d", n_samples);
 

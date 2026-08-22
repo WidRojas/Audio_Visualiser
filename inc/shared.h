@@ -3,6 +3,7 @@
 
 #include <pthread.h>
 #include <bits/pthreadtypes.h>
+#include <stdint.h>
 typedef struct {
 	int argc;
 	char **argv;
@@ -13,7 +14,7 @@ typedef struct {
 	int expected_Chunksize;
 	int volatile *buffered_Chunksize;
 	int volatile *is_ready;
-	int is_locked;
+	uint32_t *format;
 
 	// possibly include flags indicating whether buffer is full and whether is has been read
 	// to coordinate with display thread
