@@ -1,7 +1,7 @@
 CC=gcc
-SRCS=AudioSink.c main.c fft.c
+SRCS=AudioSink.c main.c fft.c shared.c
 OBJS=$(patsubst %.c,%.o,$(SRCS))
-CFLAGS= -lfftw3 -O2 -lm -g -pthread $$(pkg-config --cflags --libs libpipewire-0.3) 
+CFLAGS= -lfftw3 -O0 -lm -g -pthread $$(pkg-config --cflags --libs libpipewire-0.3) 
 INC=-Iinc
 BIN=Indicate
 # add -O2 at some point current breaks due to parse frame

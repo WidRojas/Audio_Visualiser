@@ -8,7 +8,7 @@
  [title]
  */
 #include "AudioSink.h"
-#include "fftw.h"
+#include "shared.h"
 
 #include <bits/pthreadtypes.h>
 #include <pthread.h>
@@ -22,6 +22,7 @@
 
 #include <pipewire/pipewire.h>
 #include <pipewire/filter.h>
+#include <string.h>
 
 
 struct port {
@@ -46,6 +47,14 @@ static void on_process(void *userdata, struct spa_io_position *position)
 
         startup *buffer = data->startup;
 
+        if (buffer->isRunning[0] != 1) {
+                pw_main_loop_quit(data->loop);
+        }
+
+        //if (buffer->format == NULL){
+        //       buffer->format[0] = n_samples;
+        //}
+
         pw_log_trace("do process %d", n_samples);
 
 
@@ -57,16 +66,12 @@ static void on_process(void *userdata, struct spa_io_position *position)
         // get data and samples
        //printf("%d\n",position->clock.rate.denom); sample rate
 
-        pthread_mutex_lock(buffer->lock);
 
-        for (int i = 0; i < n_samples ; i++){
-
-                buffer->data[i] = in[i];
-                //sprintf(file_buffer, "%f\n",in[i]);
-                //fputs(file_buffer,fptr);
-        }; // this can be streamlined with a memcpy or something
-
-        pthread_mutex_unlock(buffer->lock);
+        if (buffer->is_ready[0] == 0 ){   // if data buffer is not full  this gets reset upon read
+                pthread_mutex_lock(buffer->lock); // lock out and parse new
+                fill_data_buffer(buffer,n_samples,in);
+                pthread_mutex_unlock(buffer->lock);
+        }
 
 }
 
@@ -75,11 +80,6 @@ static const struct pw_filter_events filter_events = {
         .process = on_process,
 };
 
-static void do_quit(void *userdata, int signal_number)
-{
-        struct data *data = userdata;
-        pw_main_loop_quit(data->loop);
-}
 
 void *AudioSink(void *arg)
 {
@@ -99,8 +99,6 @@ void *AudioSink(void *arg)
 
         data.startup = arg;
 
-        pw_loop_add_signal(pw_main_loop_get_loop(data.loop), SIGINT, do_quit, &data);
-        pw_loop_add_signal(pw_main_loop_get_loop(data.loop), SIGTERM, do_quit, &data);
 
         /* Create a simple filter, the simple filter manages the core and remote
          * objects for you if you don't need to deal with them.

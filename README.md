@@ -13,3 +13,10 @@ make
 
 1. Run Indicate
 2. Pipe desired audio channel into sink via CLI tools or external software(qpwgraph)
+
+``` bash
+
+# application arguments :
+
+./Indicate (bars) (sensitivity) (char limit)
+```

@@ -1,7 +1,5 @@
 //  TODO :
-//  file parsing need to replaced with some type of thread coordinated variable
 //  malloc should probably only be freed at the very end and use realloc during runtime
-//  program should handle sigterm events
 //  include the uart as a flag (also clearer flags)
 //
 //  change rendering framerate and use syswrites to improve performance
@@ -12,7 +10,6 @@
 
 #include <fcntl.h>
 #include <fftw3.h>
-#include <fftw.h>
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -20,6 +17,8 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
+
+#include "shared.h"
 
 // this include mirror signals so we divide by 2 in data fitting
 #define FRAME_DATA 2048
@@ -56,14 +55,11 @@ audioSection frame[] = {
     {256, 769, 10} // 7. 6k - 24k brilliance
 };
 
-void parse_frame(double *input, startup arg);
+void parse_frame(double *input, startup *arg);
 void write_out(fftw_complex *out);
 void fitdata(fftw_complex *out, double *fitted, int size);
-void display(double *data, int size, double sensitivity, int cap,
-             uint8_t *UART);
+void display(double *data, int size, double sensitivity, int cap, uint8_t *UART);
 void updateFrame(audioSection *frame, int size);
-
-
 void enableSerial();
 
 void *FFTW(void *arg) {
@@ -105,17 +101,43 @@ void *FFTW(void *arg) {
   }
 
   double in[FRAME_DATA];
+  memset(in, 0, sizeof(double)* FRAME_DATA);
 
   out = (fftw_complex *)fftw_malloc(sizeof(fftw_complex) * FRAME_DATA);
   p = fftw_plan_dft_r2c_1d(FRAME_DATA, in, out, FFTW_ESTIMATE);
   // https://www.fftw.org/fftw3_doc/One_002dDimensional-DFTs-of-Real-Data.html
 
   updateFrame(frame, bar_data_size);
+  
+  while ( (int volatile)args->isRunning[0] == 1) {
 
-  while (1) {
-    parse_frame(in, *args); 
-    fftw_execute(p);       // apply fftw
-    usleep(33333);            // framerate
+    pthread_mutex_lock(args->lock);
+
+    if(args->is_ready[0] == 1){
+      parse_frame(in, args); 
+      
+      //for (int i = 0 ; i < 2048 ; i++){
+        //printf("%f %d\n",in[i],i);
+      //}
+
+      fftw_execute(p);       // apply fftw
+      pthread_mutex_unlock(args->lock);
+
+    }  else {
+      pthread_mutex_unlock(args->lock);
+    }
+    
+    /* Hardcoded for now 
+    current system was built under assumption that frames format would always be 2048
+    turns out applications negotiate this with pipewire so when aiming for 30 fps consider...
+
+    when frame size = 2048 timeout = 33333us
+    when frame size = 512  timeout = (33333/4)us  
+
+    this is because if frames are less than 2048 we need to run the filter 4 times
+    */
+    usleep(8333);
+    
     printf("\e[1;1H\e[2J"); // clear screen
     fitdata(out, bar_data, bar_data_size);
     display(bar_data, bar_data_size, bar_sensitivity, bar_cap, LEDBUFF);
@@ -123,10 +145,6 @@ void *FFTW(void *arg) {
     // UART feature
     // write(fd,LEDBUFF,sizeof(LEDBUFF)); LED UART
 
-    // TODO :
-    //  instead of while 1 we need to handle sigterm in main so we actaully run
-    //  clean up code
-    //
     memset(bar_data, 0, bar_data_size * sizeof(double));
   }
 
@@ -140,13 +158,16 @@ void *FFTW(void *arg) {
   return NULL;
 }
 
-void parse_frame(double *input, startup arg) {
+void parse_frame(double *input, startup *arg) {
 
-      pthread_mutex_lock(arg.lock);
+
     for (int i = 0; i < FRAME_DATA; i++) {
-      input[i] = arg.data[i];
+      input[i] = (double)arg->data[i];
+      //printf("%f %d\n",input[i],i);
     }
-      pthread_mutex_unlock(arg.lock);
+      arg->buffered_Chunksize[0] = 0;
+      arg->is_ready[0] = 0;
+      
 }
 
 void fitdata(fftw_complex *out, double *fitted, int size) {
@@ -156,7 +177,9 @@ void fitdata(fftw_complex *out, double *fitted, int size) {
 
   for (int i = 0; i < uniqueSamples; i++) {
     magnitudes[i] = sqrt((pow(out[i][0], 2)) + (pow(out[i][1], 2)));
+    //printf("%f: %f :%f: %d\n",out[i][0],out[i][1],magnitudes[i],i);
   }
+  
 
   int currentindex = 0;
 
@@ -242,8 +265,7 @@ void enableSerial() {
   ioctl(fd, TCSETS2, &options);
 }
 
-void display(double *data, int size, double sensitivity, int cap,
-             uint8_t *UART) {
+void display(double *data, int size, double sensitivity, int cap, uint8_t *UART) {
   int barPosition = 0;
   double fillAmount = 0;
 
@@ -259,7 +281,7 @@ void display(double *data, int size, double sensitivity, int cap,
   }
   char *curr = buffer;
 
-  printf("\t[Indicate V1.3]\n");
+  printf("\t[Indicate V1.4]\n");
   while (barPosition < size) {
     if (fillAmount < data[barPosition]) {
       fillAmount += (1 / sensitivity);
