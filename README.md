@@ -23,7 +23,7 @@ make
 ./Indicate (int: bars) (double: sensitivity) (int: character limit) ("enable"/"disable") (serial location: ex:"/dev/ttyUSB0")
 ```
 
-when sending UART data, formatis sent as...
+when sending UART data, format is sent as...
 
 ```
 
