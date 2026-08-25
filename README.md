@@ -1,7 +1,9 @@
-# Audio_Visualizer
-TUI Audio Visualizer 
 
-![image](./showcase.gif)
+![image](./media/logo.gif)
+
+TUI Audio Visualizer built for the Pipewire multimedia server
+
+![image](./media/showcase.gif)
 
 # Installation
 ```
@@ -18,5 +20,17 @@ make
 
 # application arguments :
 
-./Indicate (bars) (sensitivity) (char limit)
+./Indicate (int: bars) (double: sensitivity) (int: character limit) ("enable"/"disable") (serial location: ex:"/dev/ttyUSB0")
+```
+
+when sending UART data, formatis sent as...
+
+```
+
+[start bit]  bars * [bar data (0 -100)] [end bit]
+
+so when set to 3 bars the packet would look like
+
+[start bit, 10 , 25 ,75 , endbit]
+
 ```
