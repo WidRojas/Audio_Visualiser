@@ -5,6 +5,15 @@ TUI Audio Visualizer built for the Pipewire multimedia server
 
 ![image](./media/showcase.gif)
 
+# Prerequisites
+
+```
+libpipewire-0.3-dev
+libfftw3-dev
+
+can be installed via package manager
+```
+
 # Installation
 ```
 git clone https://github.com/WidRojas/Audio_Visualiser.git
